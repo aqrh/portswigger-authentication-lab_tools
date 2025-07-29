@@ -25,7 +25,7 @@ running_jobs() {
 
 execute() {
 	send_code "$1" "$2" "$3" "$4" "$5_response" "$5" &&
-	if ! cat $5_response | grep "Incorrect"; then # For disable output use: "grep -q "Incorrect"
+	if ! cat $5_response | grep -q "Incorrect"; then # For disable output use: "grep -q "Incorrect"
 		echo "[!] Found code: $5"
 		echo "$5" > valid_code
 
